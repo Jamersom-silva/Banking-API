@@ -4,8 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 
 import { AuthProvider } from './contexts/AuthProvider';
-import { LoadingProvider } from './contexts/LoadingProvider';
 import { AccountProvider } from './contexts/AccountProvider';
+import { LoadingProvider } from './contexts/LoadingProvider';
 
 import GlobalLoading from './components/GlobalLoading';
 

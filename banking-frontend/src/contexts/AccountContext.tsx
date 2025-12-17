@@ -1,8 +1,9 @@
 import { createContext } from 'react';
 
-interface AccountContextData {
+export interface AccountContextData {
   accountId: string | null;
 }
 
-export const AccountContext =
-  createContext<AccountContextData | undefined>(undefined);
+export const AccountContext = createContext<AccountContextData | undefined>(
+  undefined
+);

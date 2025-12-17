@@ -1,18 +1,32 @@
 import { api } from './api';
-import type { Account } from '../types/Account';
 import type { BankTransaction } from '../types/Transaction';
 
-export async function getAccounts(): Promise<Account[]> {
-  const response = await api.get('/accounts');
+/**
+ * Lista todas as contas do usuário autenticado
+ */
+export async function getAccounts() {
+  const response = await api.get('/api/v1/accounts');
   return response.data;
 }
 
+/**
+ * Retorna o saldo da conta
+ */
 export async function getBalance(accountId: string): Promise<number> {
-  const response = await api.get(`/accounts/${accountId}/balance`);
+  const response = await api.get(
+    `/api/v1/accounts/${accountId}/balance`
+  );
   return response.data.balance;
 }
 
-export async function getStatement(accountId: string): Promise<BankTransaction[]> {
-  const response = await api.get(`/accounts/${accountId}/statement`);
-  return response.data.items;
+/**
+ * Retorna o extrato da conta
+ */
+export async function getStatement(
+  accountId: string
+): Promise<BankTransaction[]> {
+  const response = await api.get(
+    `/api/v1/accounts/${accountId}/statement`
+  );
+  return response.data;
 }

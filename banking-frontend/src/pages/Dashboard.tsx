@@ -4,27 +4,40 @@ import StatCard from '../components/StatCard';
 import TransactionsList from '../components/TransactionsList';
 import BalanceChart from '../components/BalanceChart';
 
-import { getAccounts, getBalance, getStatement } from '../services/accountService';
+import { getBalance, getStatement } from '../services/accountService';
+import { useAccount } from '../hooks/useAccount';
+import { useLoading } from '../hooks/useLoading';
+
 import type { BankTransaction } from '../types/Transaction';
 
 export default function Dashboard() {
+  const { accountId } = useAccount();
+  const { startLoading, stopLoading } = useLoading();
+
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
 
-  useEffect(() => {
-    async function loadData() {
-      const accounts = await getAccounts();
-      const accountId = accounts[0].id;
+ useEffect(() => {
+  if (!accountId) return;
 
-      const balance = await getBalance(accountId);
-      const statement = await getStatement(accountId);
+  const id = accountId; // <- agora é string garantida
+
+  async function loadData() {
+    startLoading();
+
+    try {
+      const balance = await getBalance(id);
+      const statement = await getStatement(id);
 
       setBalance(balance);
       setTransactions(statement);
+    } finally {
+      stopLoading();
     }
+  }
 
-    loadData();
-  }, []);
+  loadData();
+}, [accountId, startLoading, stopLoading]);
 
   return (
     <DashboardLayout>
