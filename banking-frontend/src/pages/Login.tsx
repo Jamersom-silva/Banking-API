@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/authService';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login: signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +19,7 @@ export default function Login() {
 
     try {
       const { token } = await login({ email, password });
-      localStorage.setItem('token', token);
+      signIn(token);
       navigate('/');
     } catch {
       setError('Email ou senha inválidos');
