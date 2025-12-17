@@ -1,0 +1,95 @@
+# ============================================
+# Banking API - Git Ignore Rules
+# ============================================
+
+# === DEPENDÊNCIAS ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# === ENVIRONMENT VARIABLES ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.test
+.env.*.local
+
+# === BUILD OUTPUTS ===
+dist/
+build/
+dist-test/
+out/
+.cache/
+
+# === DATABASE ===
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/test.db
+prisma/*.db
+prisma/migrations/dev.db
+prisma/migrations/*.db
+
+# === IDE & EDITOR ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.code-workspace
+
+# === OS GENERATED ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# === LOGS ===
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# === TEST & COVERAGE ===
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+test-results/
+__snapshots__/
+
+# === TEMPORARY FILES ===
+tmp/
+temp/
+*.tmp
+*.temp
+
+# === PRISMA SPECIFIC ===
+.prisma/
+prisma/.tmp/
+prisma/migrations/*/migration.sql.tmp
+
+# === TYPE SPECIFIC ===
+*.tsbuildinfo
+
+# === DOCKER ===
+docker-compose.override.yml
+
+# === CI/CD ===
+.circleci/
+.github/workflows/*.yml.local

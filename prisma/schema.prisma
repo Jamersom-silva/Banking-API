@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Usuário do sistema
+model User {
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  cpf         String    @unique
+  password    String
+  birthDate   DateTime
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  accounts    Account[]
+  tokens      Token[]
+  
+  @@map("users")
+}
+
+// Conta bancária
+model Account {
+  id             String    @id @default(uuid())
+  userId         String
+  accountNumber  String    @unique @default(cuid())
+  agency         String    @default("0001")
+  type           String    @default("CHECKING")
+  balance        Float     @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentTransactions   Transaction[] @relation("SentTransactions")
+  receivedTransactions Transaction[] @relation("ReceivedTransactions")
+  
+  @@map("accounts")
+  @@index([userId])
+}
+
+// Transações
+model Transaction {
+  id             String    @id @default(uuid())
+  fromAccountId  String
+  toAccountId    String
+  type           String    @default("TRANSFER")
+  amount         Float
+  description    String?
+  status         String    @default("COMPLETED")
+  createdAt      DateTime  @default(now())
+
+  fromAccount    Account   @relation("SentTransactions", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccount      Account   @relation("ReceivedTransactions", fields: [toAccountId], references: [id], onDelete: Cascade)
+  
+  @@map("transactions")
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@index([createdAt])
+}
+
+// Tokens para refresh token blacklist
+model Token {
+  id          String    @id @default(uuid())
+  userId      String
+  token       String    @unique
+  type        String    @default("REFRESH")
+  expiresAt   DateTime
+  isRevoked   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("tokens")
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
