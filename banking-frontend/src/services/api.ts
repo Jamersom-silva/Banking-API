@@ -7,17 +7,25 @@ export const api = axios.create({
   },
 });
 
-// Interceptor para adicionar o token JWT
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
 
-    if (token && config.headers) {
-      // Axios v1+: usar set()
-      config.headers.set('Authorization', `Bearer ${token}`);
+  if (token && config.headers) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  return config;
+});
+
+// 🔥 INTERCEPTOR DE ERRO (401)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
     }
 
-    return config;
-  },
-  (error) => Promise.reject(error)
+    return Promise.reject(error);
+  }
 );
