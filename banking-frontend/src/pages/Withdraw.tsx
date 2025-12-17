@@ -1,26 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { withdraw } from '../services/operationService';
+import { getAccounts } from '../services/accountService';
 
-interface Props {
-  accountId: string;
-}
-
-export default function Withdraw({ accountId }: Props) {
+export default function Withdraw() {
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadAccount() {
+      const accounts = await getAccounts();
+      setAccountId(accounts[0].id);
+    }
+
+    loadAccount();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!accountId) return;
 
-    try {
-      await withdraw(accountId, { amount: Number(amount) });
-      navigate('/');
-    } finally {
-      setLoading(false);
-    }
+    await withdraw(accountId, { amount: Number(amount) });
+    navigate('/');
   }
 
   return (
@@ -34,9 +36,7 @@ export default function Withdraw({ accountId }: Props) {
         onChange={(e) => setAmount(e.target.value)}
       />
 
-      <button disabled={loading}>
-        {loading ? 'Processando...' : 'Sacar'}
-      </button>
+      <button>Sacar</button>
     </form>
   );
 }

@@ -1,30 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { transfer } from '../services/operationService';
+import { getAccounts } from '../services/accountService';
 
-interface Props {
-  accountId: string;
-}
-
-export default function Transfer({ accountId }: Props) {
+export default function Transfer() {
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadAccount() {
+      const accounts = await getAccounts();
+      setAccountId(accounts[0].id);
+    }
+
+    loadAccount();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!accountId) return;
 
-    try {
-      await transfer(accountId, {
-        toAccountId,
-        amount: Number(amount),
-      });
-      navigate('/');
-    } finally {
-      setLoading(false);
-    }
+    await transfer(accountId, {
+      toAccountId,
+      amount: Number(amount),
+    });
+
+    navigate('/');
   }
 
   return (
@@ -44,9 +47,7 @@ export default function Transfer({ accountId }: Props) {
         onChange={(e) => setAmount(e.target.value)}
       />
 
-      <button disabled={loading}>
-        {loading ? 'Processando...' : 'Transferir'}
-      </button>
+      <button>Transferir</button>
     </form>
   );
 }
