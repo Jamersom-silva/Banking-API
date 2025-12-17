@@ -1,7 +1,7 @@
-import { Transaction } from '../types/Transaction';
+import type { BankTransaction } from '../types/Transaction';
 
 interface Props {
-  transactions: Transaction[];
+  transactions: BankTransaction[];
 }
 
 export default function TransactionsList({ transactions }: Props) {

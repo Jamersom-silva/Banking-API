@@ -1,9 +1,8 @@
-export type Transaction = 'deposit' | 'withdrawal' | 'transfer';
+export type TransactionType = 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER';
 
-export interface TransactionRecord {
-    id: number;
-    type: Transaction;
-    amount: number;
-    date: string; // ISO date string
-    description?: string;
+export interface BankTransaction {
+  id: number;
+  type: TransactionType;
+  amount: number;
+  date: string;
 }
