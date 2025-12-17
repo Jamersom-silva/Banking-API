@@ -14,6 +14,19 @@ class AccountController {
     }
   }
 
+    // ✅ NOVO: Verificar consistência do saldo
+  async verifyBalance(req: AuthRequest, res: Response) {
+    try {
+      const result = await accountService.verifyBalance(
+        req.params.id,
+        req.user!.userId
+      );
+      sendSuccess(res, result, 'Consistência verificada');
+    } catch (error: unknown) {
+      handleControllerError(error, res);
+    }
+  }
+
   async getAccount(req: AuthRequest, res: Response) {
     try {
       const account = await accountService.getAccount(
@@ -86,6 +99,21 @@ class AccountController {
       handleControllerError(error, res);
     }
   }
+  // ✅ NOVO: Obter saldo atual
+  async getBalance(req: AuthRequest, res: Response) {
+    try {
+      const result = await accountService.getCurrentBalance(
+        req.params.id,
+        req.user!.userId
+      );
+      sendSuccess(res, result, 'Saldo obtido com sucesso');
+    } catch (error: unknown) {
+      handleControllerError(error, res);
+    }
+  }
 }
+
+
+
 
 export default new AccountController();

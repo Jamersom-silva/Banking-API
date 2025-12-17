@@ -39,6 +39,37 @@ export const transferSchema = z.object({
     .optional(),
 });
 
+// Schema para filtros avançados de transações
+export const advancedStatementSchema = z.object({
+  type: z.enum(['DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'FEE', 'INTEREST', 'PAYMENT', 'REVERSAL', 'ADJUSTMENT'])
+    .optional(),
+  status: z.enum(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED'])
+    .optional(),
+  from: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial deve estar no formato YYYY-MM-DD')
+    .optional(),
+  to: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final deve estar no formato YYYY-MM-DD')
+    .optional(),
+  minAmount: z.coerce.number()
+    .positive('Valor mínimo deve ser positivo')
+    .optional(),
+  maxAmount: z.coerce.number()
+    .positive('Valor máximo deve ser positivo')
+    .optional(),
+  page: z.coerce.number()
+    .int()
+    .min(1, 'Página deve ser maior que 0')
+    .default(1)
+    .optional(),
+  limit: z.coerce.number()
+    .int()
+    .min(1, 'Limite deve ser maior que 0')
+    .max(100, 'Limite máximo é 100')
+    .default(10)
+    .optional(),
+});
+
 // Schema para consulta de extrato
 export const statementSchema = z.object({
   from: z.string()

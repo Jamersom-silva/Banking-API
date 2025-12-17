@@ -9,76 +9,154 @@ datasource db {
 
 // Usuário do sistema
 model User {
-  id          String    @id @default(uuid())
-  name        String
-  email       String    @unique
-  cpf         String    @unique
-  password    String
-  birthDate   DateTime
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  cpf        String   @unique
+  password   String
+  birthDate  DateTime
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  zipCode    String?
+  isActive   Boolean  @default(true)
+  isVerified Boolean  @default(false)
+  role       String   @default("USER") // ADMIN, USER
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  accounts    Account[]
-  tokens      Token[]
-  
+  accounts Account[]
+  tokens   Token[]
+
+  @@index([email])
+  @@index([cpf])
+  @@index([createdAt])
   @@map("users")
 }
 
 // Conta bancária
 model Account {
-  id             String    @id @default(uuid())
-  userId         String
-  accountNumber  String    @unique @default(cuid())
-  agency         String    @default("0001")
-  type           String    @default("CHECKING")
-  balance        Float     @default(0)
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sentTransactions   Transaction[] @relation("SentTransactions")
+  accountNumber     String    @unique @default(cuid())
+  agency            String    @default("0001")
+  type              String    @default("CHECKING") // CHECKING, SAVINGS, SALARY, BUSINESS
+  balance           Float     @default(0)
+  dailyLimit        Float     @default(2000.00)
+  monthlyLimit      Float     @default(10000.00)
+  totalDeposited    Float     @default(0)
+  totalWithdrawn    Float     @default(0)
+  totalTransfers    Float     @default(0)
+  lastTransactionAt DateTime?
+
+  isActive      Boolean @default(true)
+  isBlocked     Boolean @default(false)
+  blockedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações com transações
+  sentTransactions     Transaction[] @relation("SentTransactions")
   receivedTransactions Transaction[] @relation("ReceivedTransactions")
-  
-  @@map("accounts")
+
   @@index([userId])
+  @@index([accountNumber])
+  @@index([agency])
+  @@index([type])
+  @@index([createdAt])
+  @@map("accounts")
 }
 
 // Transações
 model Transaction {
-  id             String    @id @default(uuid())
-  fromAccountId  String
-  toAccountId    String
-  type           String    @default("TRANSFER")
-  amount         Float
-  description    String?
-  status         String    @default("COMPLETED")
-  createdAt      DateTime  @default(now())
+  id          String  @id @default(uuid())
+  type        String  @default("TRANSFER") // DEPOSIT, WITHDRAWAL, TRANSFER, FEE, INTEREST, PAYMENT, REVERSAL, ADJUSTMENT
+  amount      Float
+  description String?
+  status      String  @default("COMPLETED") // PENDING, COMPLETED, FAILED, CANCELLED, REVERSED
 
-  fromAccount    Account   @relation("SentTransactions", fields: [fromAccountId], references: [id], onDelete: Cascade)
-  toAccount      Account   @relation("ReceivedTransactions", fields: [toAccountId], references: [id], onDelete: Cascade)
-  
-  @@map("transactions")
+  // Balances no momento da transação
+  previousBalance Float?
+  newBalance      Float?
+
+  // IDs das contas
+  fromAccountId String?
+  fromAccount   Account? @relation("SentTransactions", fields: [fromAccountId], references: [id], onDelete: SetNull)
+
+  toAccountId String?
+  toAccount   Account? @relation("ReceivedTransactions", fields: [toAccountId], references: [id], onDelete: SetNull)
+
+  // Informações adicionais
+  referenceId String? @unique
+  ipAddress   String?
+  deviceInfo  String?
+  location    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relação para reversões
+  reversedById   String?      @unique
+  reversedBy     Transaction? @relation("TransactionReversals", fields: [reversedById], references: [id], onDelete: SetNull)
+  reversalReason String?
+
+  // Relação inversa para reversões (precisa ser adicionada)
+  reverses Transaction? @relation("TransactionReversals")
+
+  @@unique([fromAccountId, toAccountId, amount, createdAt])
   @@index([fromAccountId])
   @@index([toAccountId])
+  @@index([type])
+  @@index([status])
   @@index([createdAt])
+  @@index([referenceId])
+  @@map("transactions")
 }
 
-// Tokens para refresh token blacklist
+// Tokens
 model Token {
-  id          String    @id @default(uuid())
-  userId      String
-  token       String    @unique
-  type        String    @default("REFRESH")
-  expiresAt   DateTime
-  isRevoked   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("tokens")
+  token     String   @unique
+  type      String   @default("REFRESH") // REFRESH, PASSWORD_RESET, EMAIL_VERIFICATION
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
   @@index([userId])
   @@index([token])
   @@index([expiresAt])
+  @@index([type])
+  @@map("tokens")
+}
+
+// Auditoria (sem tipo Json para SQLite)
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userEmail String?
+  action    String
+  entity    String
+  entityId  String?
+  changes   String? // Armazena como string JSON
+  ipAddress String?
+  userAgent String?
+  metadata  String? // Armazena como string JSON
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

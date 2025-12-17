@@ -150,6 +150,12 @@ router.get('/', accountController.getUserAccounts);
 
 // Rotas específicas de conta (requerem ownership)
 router.get('/:id', checkAccountOwnership, accountController.getAccount);
+// Nova rota para verificar consistência
+router.get(
+  '/:id/verify-balance',
+  checkAccountOwnership,
+  accountController.verifyBalance
+);
 
 // Depósito
 router.post(
@@ -157,6 +163,13 @@ router.post(
   checkAccountOwnership,
   validate(depositSchema),
   accountController.deposit
+);
+
+// Nova rota para obter saldo
+router.get(
+  '/:id/balance',
+  checkAccountOwnership,
+  accountController.getBalance
 );
 
 // Saque

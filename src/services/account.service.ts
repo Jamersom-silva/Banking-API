@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import prisma from '../config/database';
+import transactionService from './transaction.service';
 import { 
   CreateAccountInput,
   DepositInput,
@@ -10,13 +10,9 @@ import {
 import { 
   AppError, 
   NotFoundError, 
-  ValidationError,
-  ForbiddenError 
+  ValidationError 
 } from '../utils/errors';
 import { PaginatedResponse } from '../types';
-
-// Tipo para transação do Prisma
-type PrismaTransaction = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 
 export class AccountService {
   // Criar nova conta
@@ -86,198 +82,138 @@ export class AccountService {
     return account;
   }
 
-  // Realizar depósito
+  // ✅ ATUALIZADO: Depósito usando TransactionService
   async deposit(userId: string, accountId: string, data: DepositInput) {
-    return await prisma.$transaction(async (tx: PrismaTransaction) => {
-      // Buscar conta com lock para evitar race conditions
-      const account = await tx.account.findFirst({
-        where: {
-          id: accountId,
-          userId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          balance: true,
-        },
-      });
-
-      if (!account) {
-        throw new NotFoundError('Conta não encontrada');
-      }
-
-      // Atualizar saldo
-      const updatedAccount = await tx.account.update({
-        where: { id: accountId },
-        data: {
-          balance: {
-            increment: data.amount,
-          },
-        },
-        select: {
-          id: true,
-          accountNumber: true,
-          balance: true,
-        },
-      });
-
-      // Registrar transação
-      await tx.transaction.create({
-        data: {
-          fromAccountId: accountId,
-          toAccountId: accountId, // Self-transfer para depósito
-          type: 'DEPOSIT',
-          amount: data.amount,
-          description: data.description || 'Depósito',
-        },
-      });
-
-      return updatedAccount;
+    // Verificar se conta pertence ao usuário
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
     });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    // Usar TransactionService para criar depósito
+    const transaction = await transactionService.deposit(
+      accountId,
+      data.amount,
+      data.description || 'Depósito'
+    );
+
+    // Buscar saldo atualizado
+    const updatedAccount = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: {
+        id: true,
+        accountNumber: true,
+        balance: true,
+      },
+    });
+
+    return {
+      ...updatedAccount,
+      transactionId: transaction.id,
+      previousBalance: transaction.previousBalance,
+      newBalance: transaction.newBalance,
+    };
   }
 
-  // Realizar saque
+  // ✅ ATUALIZADO: Saque usando TransactionService
   async withdraw(userId: string, accountId: string, data: WithdrawInput) {
-    return await prisma.$transaction(async (tx: PrismaTransaction) => {
-      const account = await tx.account.findFirst({
-        where: {
-          id: accountId,
-          userId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          balance: true,
-        },
-      });
-
-      if (!account) {
-        throw new NotFoundError('Conta não encontrada');
-      }
-
-      // Verificar saldo suficiente
-      if (account.balance < data.amount) {
-        throw new ValidationError('Saldo insuficiente');
-      }
-
-      // Atualizar saldo
-      const updatedAccount = await tx.account.update({
-        where: { id: accountId },
-        data: {
-          balance: {
-            decrement: data.amount,
-          },
-        },
-        select: {
-          id: true,
-          accountNumber: true,
-          balance: true,
-        },
-      });
-
-      // Registrar transação
-      await tx.transaction.create({
-        data: {
-          fromAccountId: accountId,
-          toAccountId: accountId, // Self-transfer para saque
-          type: 'WITHDRAWAL',
-          amount: data.amount,
-          description: 'Saque',
-        },
-      });
-
-      return updatedAccount;
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
     });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    const transaction = await transactionService.withdraw(
+      accountId,
+      data.amount,
+      'Saque'
+    );
+
+    const updatedAccount = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: {
+        id: true,
+        accountNumber: true,
+        balance: true,
+      },
+    });
+
+    return {
+      ...updatedAccount,
+      transactionId: transaction.id,
+      previousBalance: transaction.previousBalance,
+      newBalance: transaction.newBalance,
+    };
   }
 
-  // Realizar transferência
+  // ✅ ATUALIZADO: Transferência usando TransactionService
   async transfer(userId: string, fromAccountId: string, data: TransferInput) {
-    return await prisma.$transaction(async (tx: PrismaTransaction) => {
-      // Verificar conta de origem
-      const fromAccount = await tx.account.findFirst({
-        where: {
-          id: fromAccountId,
-          userId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          balance: true,
-        },
-      });
-
-      if (!fromAccount) {
-        throw new NotFoundError('Conta de origem não encontrada');
-      }
-
-      // Verificar conta de destino
-      const toAccount = await tx.account.findUnique({
-        where: {
-          id: data.toAccountId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          userId: true,
-        },
-      });
-
-      if (!toAccount) {
-        throw new NotFoundError('Conta de destino não encontrada');
-      }
-
-      // Não permitir transferência para a mesma conta
-      if (fromAccountId === data.toAccountId) {
-        throw new ValidationError('Não é possível transferir para a mesma conta');
-      }
-
-      // Verificar saldo suficiente
-      if (fromAccount.balance < data.amount) {
-        throw new ValidationError('Saldo insuficiente');
-      }
-
-      // Atualizar saldo da conta de origem
-      await tx.account.update({
-        where: { id: fromAccountId },
-        data: {
-          balance: {
-            decrement: data.amount,
-          },
-        },
-      });
-
-      // Atualizar saldo da conta de destino
-      await tx.account.update({
-        where: { id: data.toAccountId },
-        data: {
-          balance: {
-            increment: data.amount,
-          },
-        },
-      });
-
-      // Registrar transação
-      const transaction = await tx.transaction.create({
-        data: {
-          fromAccountId,
-          toAccountId: data.toAccountId,
-          type: 'TRANSFER',
-          amount: data.amount,
-          description: data.description || 'Transferência',
-        },
-      });
-
-      return {
-        transactionId: transaction.id,
-        amount: data.amount,
-        fromAccountId,
-        toAccountId: data.toAccountId,
-        timestamp: transaction.createdAt,
-      };
+    // Verificar se conta de origem pertence ao usuário
+    const fromAccount = await prisma.account.findFirst({
+      where: {
+        id: fromAccountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
     });
+
+    if (!fromAccount) {
+      throw new NotFoundError('Conta de origem não encontrada');
+    }
+
+    // Verificar conta de destino existe
+    const toAccount = await prisma.account.findUnique({
+      where: {
+        id: data.toAccountId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!toAccount) {
+      throw new NotFoundError('Conta de destino não encontrada');
+    }
+
+    // Não permitir transferência para a mesma conta
+    if (fromAccountId === data.toAccountId) {
+      throw new ValidationError('Não é possível transferir para a mesma conta');
+    }
+
+    const transaction = await transactionService.transfer(
+      fromAccountId,
+      data.toAccountId,
+      data.amount,
+      data.description || 'Transferência'
+    );
+
+    return {
+      transactionId: transaction.id,
+      amount: data.amount,
+      fromAccountId,
+      toAccountId: data.toAccountId,
+      fromAccountNewBalance: transaction.accountBalanceChanged.fromAccount?.new,
+      toAccountNewBalance: transaction.accountBalanceChanged.toAccount?.new,
+      timestamp: transaction.createdAt,
+    };
   }
 
- // Obter extrato
+  // ✅ MELHORADO: Extrato com mais informações
   async getStatement(
     userId: string, 
     accountId: string, 
@@ -297,105 +233,179 @@ export class AccountService {
       throw new NotFoundError('Conta não encontrada');
     }
 
-    // Construir filtros
-    const where: any = {
-      OR: [
-        { fromAccountId: accountId },
-        { toAccountId: accountId },
-      ],
-    };
+    // Usar TransactionService para buscar transações
+    const result = await transactionService.getTransactions({
+      accountId,
+      fromDate: filters.from ? new Date(filters.from) : undefined,
+      toDate: filters.to ? new Date(filters.to) : undefined,
+      page: filters.page || 1,
+      limit: filters.limit || 10,
+    });
 
-    if (filters.from || filters.to) {
-      where.createdAt = {};
-      if (filters.from) {
-        where.createdAt.gte = new Date(filters.from);
-      }
-      if (filters.to) {
-        where.createdAt.lte = new Date(filters.to);
-      }
+    return result;
+  }
+
+  // ✅ NOVO: Verificar consistência do saldo
+  async verifyBalance(accountId: string, userId: string) {
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
     }
 
-    // Calcular paginação
-    const page = filters.page || 1;
-    const limit = filters.limit || 10;
-    const skip = (page - 1) * limit;
+    return transactionService.verifyBalanceConsistency(accountId);
+  }
 
-    // Buscar transações
-    const [transactions, total] = await Promise.all([
-      prisma.transaction.findMany({
-        where,
-        select: {
-          id: true,
-          type: true,
-          amount: true,
-          description: true,
-          status: true,
-          createdAt: true,
-          fromAccountId: true,
-          fromAccount: {
-            select: {
-              accountNumber: true,
-              agency: true,
-            },
-          },
-          toAccountId: true,
-          toAccount: {
-            select: {
-              accountNumber: true,
-              agency: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        skip,
-        take: limit,
-      }),
-      prisma.transaction.count({ where }),
-    ]);
+  // ✅ NOVO: Obter saldo atual
+  async getCurrentBalance(accountId: string, userId: string) {
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
 
-    // Calcular metadados de paginação
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
 
-    // Formatar resposta com tipo explícito
-    const formattedTransactions = transactions.map((
-      transaction: {
-        id: string;
-        type: string;
-        amount: number;
-        description: string | null;
-        status: string;
-        createdAt: Date;
-        fromAccountId: string;
-        fromAccount: { accountNumber: string; agency: string };
-        toAccountId: string;
-        toAccount: { accountNumber: string; agency: string };
-      }
-    ) => ({
-      id: transaction.id,
-      type: transaction.type,
-      amount: transaction.amount,
-      description: transaction.description,
-      status: transaction.status,
-      createdAt: transaction.createdAt,
-      fromAccount: transaction.fromAccount,
-      toAccount: transaction.toAccount,
-      isDebit: transaction.fromAccountId === accountId,
-    }));
+    const balance = await transactionService.getCurrentBalance(accountId);
+    
+    return {
+      accountId,
+      balance,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  // ✅ NOVO: Aplicar taxa à conta
+  async applyFee(accountId: string, userId: string, amount: number, description: string) {
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    const transaction = await transactionService.applyFee(
+      accountId,
+      amount,
+      description
+    );
 
     return {
-      data: formattedTransactions,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext,
-        hasPrev,
+      transactionId: transaction.id,
+      feeAmount: amount,
+      newBalance: transaction.newBalance,
+      description: transaction.description,
+    };
+  }
+
+  // ✅ NOVO: Aplicar juros à conta
+  async applyInterest(accountId: string, userId: string, amount: number, description?: string) {
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
       },
+      select: { id: true },
+    });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    const transaction = await transactionService.applyInterest(
+      accountId,
+      amount,
+      description || 'Juros aplicados'
+    );
+
+    return {
+      transactionId: transaction.id,
+      interestAmount: amount,
+      newBalance: transaction.newBalance,
+      description: transaction.description,
+    };
+  }
+
+  // ✅ NOVO: Fazer pagamento
+  async makePayment(accountId: string, userId: string, amount: number, description: string) {
+    const account = await prisma.account.findFirst({
+      where: {
+        id: accountId,
+        userId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!account) {
+      throw new NotFoundError('Conta não encontrada');
+    }
+
+    const transaction = await transactionService.makePayment(
+      accountId,
+      amount,
+      description
+    );
+
+    return {
+      transactionId: transaction.id,
+      paymentAmount: amount,
+      newBalance: transaction.newBalance,
+      description: transaction.description,
+    };
+  }
+
+  // ✅ NOVO: Reverter transação
+  async reverseTransaction(transactionId: string, userId: string, reason?: string) {
+    // Primeiro verificar se o usuário tem acesso à transação
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        id: transactionId,
+        OR: [
+          { fromAccount: { userId } },
+          { toAccount: { userId } },
+        ],
+      },
+      include: {
+        fromAccount: { select: { userId: true } },
+        toAccount: { select: { userId: true } },
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundError('Transação não encontrada ou acesso negado');
+    }
+
+    const reversedTransaction = await transactionService.reverseTransaction(
+      transactionId,
+      reason
+    );
+
+    return {
+      originalTransactionId: transactionId,
+      reversalTransactionId: reversedTransaction.id,
+      amount: reversedTransaction.amount,
+      reason: reversedTransaction.description,
+      timestamp: reversedTransaction.createdAt,
     };
   }
 
