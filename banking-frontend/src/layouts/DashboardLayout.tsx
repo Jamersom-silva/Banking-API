@@ -1,4 +1,5 @@
 import Sidebar from '../components/Sidebar';
+import Topbar from '../components/Topbar';
 
 interface Props {
   children: React.ReactNode;
@@ -6,9 +7,20 @@ interface Props {
 
 export default function DashboardLayout({ children }: Props) {
   return (
-    <div className="flex bg-slate-100 min-h-screen">
+    <div className="flex h-screen bg-slate-100">
+      {/* Sidebar */}
       <Sidebar />
-      <main className="flex-1 p-8">{children}</main>
+
+      {/* Main content */}
+      <div className="flex flex-col flex-1">
+        {/* Topbar */}
+        <Topbar />
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto p-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
