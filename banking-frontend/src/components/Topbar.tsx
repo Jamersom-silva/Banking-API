@@ -4,8 +4,10 @@ export default function Topbar() {
   const { logout } = useAuth();
 
   return (
-    <header className="flex justify-between items-center mb-6">
-      <h2 className="text-xl font-semibold">Bem-vindo</h2>
+    <header className="h-16 bg-white border-b flex items-center justify-between px-8">
+      <h1 className="text-lg font-semibold text-slate-800">
+        Dashboard
+      </h1>
 
       <button
         onClick={logout}
